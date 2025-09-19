@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  vroom-ors-directions:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://localhost:3001/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Include VROOM server if you want a complete stack
+  vroom:
+    image: ghcr.io/vroom-project/vroom-docker:v1.14.0
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

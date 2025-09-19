@@ -1,0 +1,44 @@
+{
+  "name": "vroom-ors-directions",
+  "version": "1.0.0",
+  "description": "A TypeScript wrapper around VROOM that uses OpenRouteService directions API instead of matrix API for enhanced routing options",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "server": "tsx src/server.ts",
+    "server:build": "npm run build && node dist/server.js"
+  },
+  "keywords": [
+    "vroom",
+    "openrouteservice",
+    "ors",
+    "routing",
+    "vehicle-routing",
+    "optimization",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.0",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/mapbox__polyline": "^1.0.5",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@mapbox/polyline": "^1.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1"
+  }
+}

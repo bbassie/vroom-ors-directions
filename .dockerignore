@@ -1,0 +1,45 @@
+# Dependencies
+node_modules
+.pnpm
+
+# Build outputs that will be rebuilt in container
+dist
+
+# Development files
+.env
+.env.local
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Documentation
+README.md
+*.md
+
+# Test files
+test
+tests
+*.test.*
+*.spec.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp
+temp
+.tmp
