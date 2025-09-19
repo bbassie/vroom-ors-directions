@@ -59,14 +59,14 @@ export class ORSClient {
     locations: Coordinate[],
     options: ORSDirectionsOptions = {}
   ): Promise<MatrixEntry[]> {
-    const promises: Promise<MatrixEntry>[] = [];
+    const thunks: Array<() => Promise<MatrixEntry>> = [];
 
-    // Create all direction requests as promises
+    // Create all direction requests as thunks (functions returning promises)
     for (let i = 0; i < locations.length; i++) {
       for (let j = 0; j < locations.length; j++) {
         if (i === j) {
           // Same location - add zero distance/duration entry
-          promises.push(Promise.resolve({
+          thunks.push(() => Promise.resolve({
             from: i,
             to: j,
             distance: 0,
@@ -75,13 +75,13 @@ export class ORSClient {
           }));
         } else {
           // Different locations - create ORS request
-          promises.push(this.getDirectionEntry(locations[i], locations[j], i, j, options));
+          thunks.push(() => this.getDirectionEntry(locations[i], locations[j], i, j, options));
         }
       }
     }
 
     // Execute all requests in parallel with controlled concurrency
-    const matrix = await this.executeWithConcurrency(promises, 10); // Limit to 10 concurrent requests
+    const matrix = await this.executeWithConcurrency(thunks, 10); // Limit to 10 concurrent requests
 
     return matrix;
   }
@@ -121,12 +121,6 @@ export class ORSClient {
 
           if (directions.routes && directions.routes.length > 0) {
             const route = directions.routes[0];
-            console.log(`Route structure for ${fromOffset + i} -> ${toOffset + j}:`, {
-              hasGeometry: !!route.geometry,
-              geometryType: typeof route.geometry,
-              geometryKeys: route.geometry ? Object.keys(route.geometry) : null,
-              geometryPreview: route.geometry ? JSON.stringify(route.geometry).substring(0, 100) + '...' : 'No geometry'
-            });
 
             // Extract polyline string from geometry
             let polyline: string | undefined = undefined;
@@ -217,12 +211,6 @@ export class ORSClient {
 
       if (directions.routes && directions.routes.length > 0) {
         const route = directions.routes[0];
-        console.log(`Route structure for ${fromIndex} -> ${toIndex}:`, {
-          hasGeometry: !!route.geometry,
-          geometryType: typeof route.geometry,
-          geometryKeys: route.geometry ? Object.keys(route.geometry) : null,
-          geometryPreview: route.geometry ? JSON.stringify(route.geometry).substring(0, 100) + '...' : 'No geometry'
-        });
 
         // Extract polyline string from geometry
         let polyline: string | undefined = undefined;
@@ -266,22 +254,34 @@ export class ORSClient {
   }
 
   private async executeWithConcurrency<T>(
-    promises: Promise<T>[],
+    thunks: Array<() => Promise<T>>,
     concurrency: number
   ): Promise<T[]> {
     const results: T[] = [];
+    let index = 0;
 
-    for (let i = 0; i < promises.length; i += concurrency) {
-      const batch = promises.slice(i, i + concurrency);
-      const batchResults = await Promise.all(batch);
-      results.push(...batchResults);
-
-      // Add a small delay between batches to be nice to the API
-      if (i + concurrency < promises.length) {
-        await this.delay(100);
+    async function worker() {
+      while (true) {
+        let currentIndex: number;
+        // Atomically get the next thunk index
+        if (index < thunks.length) {
+          currentIndex = index++;
+        } else {
+          break;
+        }
+        try {
+          const result = await thunks[currentIndex]();
+          results[currentIndex] = result;
+        } catch (e) {
+          // On error, assign undefined (or you could throw, or use a default value)
+          results[currentIndex] = undefined as unknown as T;
+        }
       }
     }
 
+    // Start up to 'concurrency' workers
+    const workers = Array.from({ length: concurrency }, () => worker());
+    await Promise.all(workers);
     return results;
   }
 

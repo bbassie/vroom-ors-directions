@@ -21,11 +21,11 @@ export class VroomORS {
   async solve(problem: VroomProblem, orsOptions: ORSDirectionsOptions = {}): Promise<VroomSolution> {
     const locations = this.extractLocations(problem);
 
+    // Ensure geometry is not requested for VROOM matrix
     const matrixEntries = await this.orsClient.createMatrix(
       locations.map(loc => ({ lat: loc[1], lng: loc[0] })),
-      orsOptions
+      { ...orsOptions, geometry: false }
     );
-
     const { durations, distances } = this.convertMatrixEntriesToMatrices(matrixEntries, locations.length);
 
     // Store geometries for route reconstruction
@@ -89,8 +89,6 @@ export class VroomORS {
       }
     };
 
-    console.log('Problem with matrix:', JSON.stringify(problemWithMatrix, null, 2));
-
     const response = await fetch(this.vroomEndpoint, {
       method: 'POST',
       headers: {
@@ -110,17 +108,23 @@ export class VroomORS {
     // Add geometry to routes
     if (solution.routes) {
       for (const route of solution.routes) {
+        // Add location field to each step using location_index
+        if (route.steps && Array.isArray(route.steps)) {
+          for (const step of route.steps) {
+            if (typeof step.location_index === 'number' && locations[step.location_index]) {
+              step.location = locations[step.location_index];
+            }
+          }
+        }
+
+        // Geometry logic (only if geometryMap is populated)
         if (route.steps && route.steps.length > 1) {
           const routeGeometries: string[] = [];
-
           for (let i = 0; i < route.steps.length - 1; i++) {
             const currentStep = route.steps[i];
             const nextStep = route.steps[i + 1];
-
-            // Get location indices directly from VROOM steps
             const fromIndex = currentStep.location_index;
             const toIndex = nextStep.location_index;
-
             if (fromIndex != null && toIndex != null) {
               const geometry = geometryMap.get(`${fromIndex}-${toIndex}`);
               if (geometry) {
@@ -128,13 +132,9 @@ export class VroomORS {
               }
             }
           }
-
-          // Add geometry to route (combine all segments)
           if (routeGeometries.length > 0) {
             console.log(`Combining ${routeGeometries.length} geometry segments for route`);
-
             try {
-              // Decode all polylines to coordinate arrays
               const decodedSegments: [number, number][][] = [];
               for (const geom of routeGeometries) {
                 if (geom && geom.length > 0) {
@@ -142,31 +142,22 @@ export class VroomORS {
                   decodedSegments.push(coordinates);
                 }
               }
-
               if (decodedSegments.length > 0) {
-                // Combine all coordinates into a single array
                 const combinedCoordinates: [number, number][] = [];
-
                 for (let i = 0; i < decodedSegments.length; i++) {
                   const segment = decodedSegments[i];
                   if (i === 0) {
-                    // Add all points from first segment
                     combinedCoordinates.push(...segment);
                   } else {
-                    // Skip first point of subsequent segments (it's the same as last point of previous)
                     combinedCoordinates.push(...segment.slice(1));
                   }
                 }
-
-                // Encode the combined coordinates back to polyline
                 const combinedPolyline = polyline.encode(combinedCoordinates);
                 (route as any).geometry = combinedPolyline;
-
                 console.log(`Combined route geometry: ${combinedCoordinates.length} points -> ${combinedPolyline.substring(0, 50)}...`);
               }
             } catch (error) {
               console.warn('Failed to combine polylines:', error);
-              // Fallback to first valid geometry
               const validGeometry = routeGeometries.find(g => g && g.length > 0);
               if (validGeometry) {
                 (route as any).geometry = validGeometry;

@@ -18,14 +18,14 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 
 // Initialize VroomORS
-const orsApiKey = process.env.ORS_API_KEY;
-const orsBaseUrl = process.env.ORS_BASE_URL;
+const orsApiKey = process.env.ORS_API_KEY || '';
+const orsBaseUrl = process.env.ORS_BASE_URL || 'http://localhost:8080';
 const vroomEndpoint = process.env.VROOM_ENDPOINT || 'http://localhost:3000';
 
-if (!orsApiKey) {
-  console.error('ERROR: ORS_API_KEY environment variable is required');
-  process.exit(1);
-}
+// if (!orsApiKey) {
+//   console.error('ERROR: ORS_API_KEY environment variable is required');
+//   process.exit(1);
+// }
 
 const vroomOrs = new VroomORS(orsApiKey, vroomEndpoint, orsBaseUrl);
 
